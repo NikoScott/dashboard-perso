@@ -7,18 +7,11 @@ import com.crm.freelance.mapper.CrmMapper;
 import com.crm.freelance.model.Contact;
 import com.crm.freelance.repository.ContactRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-
-/**
- * Logique métier des contacts. Toute la logique vit ICI (pas dans le controller,
- * pas dans le repository). Le controller ne fait que recevoir/renvoyer du HTTP.
- *
- * Injection par constructeur (via @RequiredArgsConstructor sur les champs final) :
- * dépendances immuables, facile à mocker en test, pas de @Autowired sur les champs.
- */
 @Service
 @RequiredArgsConstructor
 public class ContactService {
@@ -40,10 +33,8 @@ public class ContactService {
     }
 
     @Transactional(readOnly = true)
-    public List<ContactResponse> lister() {
-        return contactRepository.findAll().stream()
-                .map(CrmMapper::toResponse)
-                .toList();
+    public Page<ContactResponse> lister(Pageable pageable) {
+        return contactRepository.findAll(pageable).map(CrmMapper::toResponse);
     }
 
     @Transactional(readOnly = true)
@@ -67,7 +58,7 @@ public class ContactService {
     @Transactional
     public void supprimer(Long id) {
         Contact contact = getOrThrow(id);
-        contactRepository.delete(contact); // cascade ALL => supprime aussi ses opportunités
+        contactRepository.delete(contact);
     }
 
     private Contact getOrThrow(Long id) {
@@ -75,11 +66,6 @@ public class ContactService {
                 .orElseThrow(() -> ResourceNotFoundException.of("Contact", id));
     }
 
-    /**
-     * Garde métier : le service ne fait pas confiance à son appelant. Même si la
-     * validation @Valid du controller est court-circuitée (appel direct, test, autre
-     * service), l'invariant "un contact a un nom" reste garanti ici.
-     */
     private void validerObligatoires(ContactRequest req) {
         if (req.nom() == null || req.nom().isBlank()) {
             throw new IllegalArgumentException("Le nom est obligatoire");

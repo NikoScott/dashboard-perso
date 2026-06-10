@@ -12,6 +12,8 @@ import com.crm.freelance.repository.OpportuniteRepository;
 import com.crm.freelance.repository.RelanceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,12 +27,8 @@ public class OpportuniteService {
     private final OpportuniteRepository opportuniteRepository;
     private final ContactRepository contactRepository;
     private final RelanceRepository relanceRepository;
+    private final EmailService emailService;
 
-    /**
-     * Délai (jours) sans action au-delà duquel une opportunité est "à relancer".
-     * Externalisé en configuration (application.properties : crm.relance.delai-jours),
-     * défaut 7. Évite le "nombre magique" en dur dans le code.
-     */
     @Value("${crm.relance.delai-jours:7}")
     private int delaiRelanceJours;
 
@@ -51,10 +49,8 @@ public class OpportuniteService {
     }
 
     @Transactional(readOnly = true)
-    public List<OpportuniteResponse> rechercher(StatutOpportunite statut, TypeOpportunite type) {
-        return opportuniteRepository.rechercher(statut, type).stream()
-                .map(CrmMapper::toResponse)
-                .toList();
+    public Page<OpportuniteResponse> rechercher(StatutOpportunite statut, TypeOpportunite type, Pageable pageable) {
+        return opportuniteRepository.rechercher(statut, type, pageable).map(CrmMapper::toResponse);
     }
 
     @Transactional
@@ -78,7 +74,6 @@ public class OpportuniteService {
         return CrmMapper.toResponse(opportuniteRepository.save(opportunite));
     }
 
-    /** Change UNIQUEMENT le statut + enregistre l'action (met à jour dateDerniereAction). */
     @Transactional
     public OpportuniteResponse changerStatut(Long id, StatutOpportunite statut) {
         Opportunite opportunite = getOrThrow(id);
@@ -87,10 +82,6 @@ public class OpportuniteService {
         return CrmMapper.toResponse(opportuniteRepository.save(opportunite));
     }
 
-    /**
-     * Opportunités à relancer : dernière action il y a plus de {delaiRelanceJours} jours
-     * ET statut non terminal. La règle elle-même est sur l'entité (estARelancer).
-     */
     @Transactional(readOnly = true)
     public List<OpportuniteResponse> opportunitesARelancer() {
         LocalDateTime seuil = LocalDateTime.now().minusDays(delaiRelanceJours);
@@ -101,9 +92,8 @@ public class OpportuniteService {
     }
 
     /**
-     * Ajoute une relance à une opportunité.
-     * Règle métier : ajouter une relance EST une action -> on met à jour
-     * dateDerniereAction, donc l'opportunité sort de la liste "à relancer".
+     * Ajoute une relance et envoie une notification email (best effort : l'échec
+     * d'envoi ne fait pas rater la transaction).
      */
     @Transactional
     public RelanceResponse ajouterRelance(Long opportuniteId, RelanceRequest req) {
@@ -119,19 +109,18 @@ public class OpportuniteService {
         opportunite.getRelances().add(relance);
         opportunite.setDateDerniereAction(LocalDateTime.now());
 
-        // On persiste la relance via SON repository : save() renvoie l'entité managée
-        // avec son id déjà généré (stratégie IDENTITY -> INSERT immédiat). C'est cette
-        // instance qu'on mappe, sinon la réponse renverrait id=null (l'id n'arriverait
-        // qu'au flush de fin de transaction, après le return).
         Relance relancePersistee = relanceRepository.save(relance);
-        opportuniteRepository.save(opportunite); // met à jour dateDerniereAction
+        opportuniteRepository.save(opportunite);
+
+        String contactNom = opportunite.getContact() != null ? opportunite.getContact().getNom() : "Inconnu";
+        emailService.envoyerNotificationRelance(opportunite.getTitre(), contactNom, req.note());
 
         return CrmMapper.toResponse(relancePersistee);
     }
 
     @Transactional(readOnly = true)
     public List<RelanceResponse> historiqueRelances(Long opportuniteId) {
-        getOrThrow(opportuniteId); // 404 si l'opportunité n'existe pas
+        getOrThrow(opportuniteId);
         return relanceRepository.findByOpportunite_IdOrderByDateDesc(opportuniteId).stream()
                 .map(CrmMapper::toResponse)
                 .toList();

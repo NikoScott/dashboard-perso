@@ -9,6 +9,7 @@ import com.crm.freelance.model.TypeOpportunite;
 import com.crm.freelance.repository.ContactRepository;
 import com.crm.freelance.repository.OpportuniteRepository;
 import com.crm.freelance.repository.RelanceRepository;
+import com.crm.freelance.service.EmailService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -42,6 +43,7 @@ class OpportuniteServiceTest {
     @Mock private OpportuniteRepository opportuniteRepository;
     @Mock private ContactRepository contactRepository;
     @Mock private RelanceRepository relanceRepository;
+    @Mock private EmailService emailService;
 
     @InjectMocks private OpportuniteService opportuniteService;
 
