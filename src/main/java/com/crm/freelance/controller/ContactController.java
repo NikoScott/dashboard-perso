@@ -12,6 +12,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/contacts")
 @RequiredArgsConstructor
@@ -43,6 +45,11 @@ public class ContactController {
     @PutMapping("/{id}")
     public ContactResponse modifier(@PathVariable Long id, @Valid @RequestBody ContactRequest req) {
         return contactService.modifier(id, req);
+    }
+
+    @GetMapping("/entreprises")
+    public List<String> entreprises() {
+        return contactService.listerEntreprises();
     }
 
     @DeleteMapping("/{id}")

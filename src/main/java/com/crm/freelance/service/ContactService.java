@@ -2,6 +2,7 @@ package com.crm.freelance.service;
 
 import com.crm.freelance.dto.ContactRequest;
 import com.crm.freelance.dto.ContactResponse;
+import java.util.List;
 import com.crm.freelance.exception.ResourceNotFoundException;
 import com.crm.freelance.mapper.CrmMapper;
 import com.crm.freelance.model.Contact;
@@ -59,6 +60,11 @@ public class ContactService {
     public void supprimer(Long id) {
         Contact contact = getOrThrow(id);
         contactRepository.delete(contact);
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> listerEntreprises() {
+        return contactRepository.findDistinctEntreprises();
     }
 
     private Contact getOrThrow(Long id) {

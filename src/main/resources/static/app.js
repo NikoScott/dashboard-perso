@@ -505,8 +505,12 @@ function editContact(id) {
   if (c) openContactModal(c)
 }
 
-function openContactModal(contact) {
+async function openContactModal(contact) {
   const e = !!contact
+  let entreprises = []
+  try { entreprises = await GET('/contacts/entreprises') } catch (_) {}
+  const datalistId = 'dl-entreprises'
+  const datalistOpts = (entreprises || []).map(n => `<option value="${esc(n)}">`).join('')
   openModal(`<div class="p-6">
     <h2 class="text-lg font-bold text-gray-900 mb-5">${e ? 'Modifier le contact' : 'Nouveau contact'}</h2>
     <form onsubmit="submitContact(event, ${e ? contact.id : 'null'})">
@@ -515,7 +519,14 @@ function openContactModal(contact) {
           ${formField('nom',    'Nom *',    'text', e ? contact.nom    : '', '', true)}
           ${formField('prenom','Prénom',    'text', e ? (contact.prenom || '') : '')}
         </div>
-        ${formField('entreprise','Entreprise','text', e ? (contact.entreprise || '') : '')}
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Entreprise</label>
+          <input name="entreprise" type="text" list="${datalistId}"
+            value="${esc(e ? (contact.entreprise || '') : '')}"
+            autocomplete="off"
+            class="${selectCls()}" placeholder="Nom de l'entreprise">
+          <datalist id="${datalistId}">${datalistOpts}</datalist>
+        </div>
         ${formField('email',  'Email',    'email', e ? (contact.email     || '') : '')}
         ${formField('telephone','Téléphone','text', e ? (contact.telephone || '') : '')}
         <div>
